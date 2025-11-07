@@ -118,3 +118,8 @@ STATIC_URL = 'static/'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# Debe apuntar a una carpeta llamada 'media' en la raíz del proyecto.
+MEDIA_ROOT = BASE_DIR / 'media' 
+
+# URL base para servir esos archivos (ej: http://127.0.0.1:8000/media/foto.jpg)
+MEDIA_URL = '/media/'
