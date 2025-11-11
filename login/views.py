@@ -1,10 +1,11 @@
 from django.contrib.auth import authenticate
-from rest_framework.decorators import api_view, parser_classes # 🛑 AÑADIDO parser_classes
+from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser # 🛑 NUEVO: Para manejar archivos (fotos)
-from .serializers import HerramientaSerializer, RegistroUsoSerializer # 🛑 NUEVO: Importar Serializers
-from .models import Herramienta, Profile, LoginChallenge 
+from rest_framework.parsers import MultiPartParser, FormParser 
+from django.shortcuts import get_object_or_404 
+from .serializers import HerramientaSerializer, RegistroUsoSerializer 
+from .models import Herramienta, Profile, LoginChallenge, RegistroUso 
 from django.contrib.auth.models import User
 import random
 
@@ -77,9 +78,8 @@ def register_view(request):
 
 # ------------------- VISTAS DE HERRAMIENTAS MODIFICADAS/NUEVAS -------------------
 
-# 🛑 FUNCIÓN MODIFICADA: Ahora usa Serializers y maneja fotos
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser]) # Permite recibir archivos y data de formulario
+@parser_classes([MultiPartParser, FormParser])
 def registrar_herramienta(request):
     """
     Vista para manejar el POST y guardar una nueva Herramienta, incluyendo foto y descripción.
@@ -88,25 +88,57 @@ def registrar_herramienta(request):
     
     if serializer.is_valid():
         serializer.save()
-        # Retorna los datos serializados, incluyendo la URL de la foto (si se subió)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# 🛑 FUNCIÓN NUEVA: Para registrar el uso después del escaneo del QR
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser]) # Permite recibir archivos y data de formulario (foto de evidencia)
+@parser_classes([MultiPartParser, FormParser])
 def registrar_uso(request):
     """
     Guarda el registro de uso (escaneo del QR) incluyendo la foto de evidencia.
     """
-    # Nota: Asegúrate de que el 'herramienta' y 'usuario' se envíen como IDs en el body
     serializer = RegistroUsoSerializer(data=request.data)
     
     if serializer.is_valid():
         serializer.save()
         return Response({'message': 'Registro de uso guardado con éxito', 'data': serializer.data}, 
-                          status=status.HTTP_201_CREATED)
+                        status=status.HTTP_201_CREATED)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def ver_detalle_uso_seguro(request, id): # 🚨 Cambio de 'registro_id' a 'id'
+    """
+    Busca un registro de uso por ID, verifica permisos y devuelve todos sus detalles 
+    enriquecidos (usuario, serial, foto URL completa).
+    """
+    
+    # 1. Obtener el Registro
+    try:
+        # Usamos el ID pasado en la URL
+        registro = RegistroUso.objects.get(pk=id) 
+    except RegistroUso.DoesNotExist:
+        return Response({'message': f'Registro de uso con ID {id} no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # 2. Lógica de Permisos
+    if not request.user.is_authenticated:
+        return Response({'message': 'Se requiere autenticación para ver este detalle.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Nota: Si el usuario está autenticado, permitimos el acceso. 
+    # Para ser más seguros, podrías añadir:
+    # if not request.user.is_superuser:
+    #     return Response({'message': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+    # 3. Serializar la data
+    serializer = RegistroUsoSerializer(registro)
+    data = serializer.data
+    
+    # 4. Insertar la URL COMPLETA de la foto
+    if data['foto_evidencia']:
+        # IMPORTANTE: La URL completa para acceso externo
+        data['foto_evidencia'] = f'http://192.168.0.58:8000{data["foto_evidencia"]}'
+
+    return Response(data, status=status.HTTP_200_OK)

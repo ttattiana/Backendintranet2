@@ -1,18 +1,38 @@
 from rest_framework import serializers
 from .models import Herramienta, RegistroUso
+from django.contrib.auth.models import User # Importamos el modelo de Usuario de Django
 
-# Serializer para manejar la creación y edición de Herramientas
+# --- 1. Serializer para Herramienta ---
 class HerramientaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Herramienta
-        # Incluimos 'foto' y 'descripcion' para poder recibirlas en la API
         fields = ['id', 'nombre', 'serial', 'equipo_id', 'foto', 'descripcion', 'fecha_registro']
-        read_only_fields = ['fecha_registro'] # Estos se establecen automáticamente
+        read_only_fields = ['fecha_registro']
 
-# Serializer para manejar el registro de uso al escanear el QR
+# --- 2. Serializer para información básica del Usuario ---
+class UserSerializer(serializers.ModelSerializer):
+    """Serializa la información básica del usuario (nombre y apellido)."""
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name']
+        
+# --- 3. Serializer principal para Registro de Uso (Corregido) ---
 class RegistroUsoSerializer(serializers.ModelSerializer):
+    """
+    Serializa el registro de uso, incluyendo la información enriquecida 
+    del usuario y el serial de la herramienta.
+    """
+    # Campos enriquecidos para la respuesta
+    usuario_info = UserSerializer(source='usuario', read_only=True)
+    serial_herramienta = serializers.CharField(source='herramienta.serial', read_only=True)
+
     class Meta:
         model = RegistroUso
-        # Incluimos todos los campos para el registro de escaneo (incluyendo la foto de evidencia)
-        fields = '__all__'
+        # ✅ CORRECCIÓN CLAVE: Usamos 'fecha_uso' en lugar de 'fecha_registro'
+        fields = (
+            'id', 'herramienta', 'usuario', 'ubicacion', 'estado', 
+            'observaciones', 'foto_evidencia', 'fecha_uso',  # ¡CAMBIO APLICADO!
+            'usuario_info', 'serial_herramienta' 
+        )
+        # ✅ Establecemos 'fecha_uso' como de solo lectura
         read_only_fields = ['fecha_uso']
