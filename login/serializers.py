@@ -26,13 +26,10 @@ class RegistroUsoSerializer(serializers.ModelSerializer):
     usuario_info = UserSerializer(source='usuario', read_only=True)
     serial_herramienta = serializers.CharField(source='herramienta.serial', read_only=True)
 
-    class Meta:
-        model = RegistroUso
-        # ✅ CORRECCIÓN CLAVE: Usamos 'fecha_uso' en lugar de 'fecha_registro'
-        fields = (
-            'id', 'herramienta', 'usuario', 'ubicacion', 'estado', 
-            'observaciones', 'foto_evidencia', 'fecha_uso',  # ¡CAMBIO APLICADO!
-            'usuario_info', 'serial_herramienta' 
-        )
-        # ✅ Establecemos 'fecha_uso' como de solo lectura
-        read_only_fields = ['fecha_uso']
+    class HerramientaSerializer(serializers.ModelSerializer):
+     class Meta:
+        model = Herramienta
+        # ✅ AJUSTE: Volvemos a usar 'fecha_registro'
+        fields = ['id', 'nombre', 'serial', 'equipo_id', 'foto', 'descripcion', 'fecha_registro']
+        # ✅ AJUSTE: Volvemos a usar 'fecha_registro'
+        read_only_fields = ['fecha_registro']

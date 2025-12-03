@@ -27,10 +27,9 @@ def login_view(request):
     otp = str(random.randint(100000, 999999))
     challenge = LoginChallenge.objects.create(user=user, otp=otp)
 
-    print(f"[DEBUG OTP] Enviar OTP a {user.email}: {otp}") 
+    print(f"[DEBUG OTP] Enviar OTP a {user.email}: {otp}")
 
     return Response({'challenge': str(challenge.challenge)}, status=status.HTTP_200_OK)
-
 
 @api_view(['POST'])
 def verify_otp(request):
@@ -56,7 +55,6 @@ def verify_otp(request):
 
     return Response({'message': 'Login exitoso', 'user': user_data}, status=status.HTTP_200_OK)
 
-
 @api_view(['POST'])
 def register_view(request):
     name = request.data.get('name')
@@ -70,7 +68,7 @@ def register_view(request):
     if User.objects.filter(email=email).exists():
         return Response({'message': 'Email ya registrado'}, status=status.HTTP_400_BAD_REQUEST)
 
-    username = email.split('@')[0] 
+    username = email.split('@')[0]
 
     user = User.objects.create_user(username=username, email=email, password=password, first_name=name)
     
@@ -85,13 +83,10 @@ def registrar_herramienta(request):
     Vista para manejar el POST y guardar una nueva Herramienta, incluyendo foto y descripción.
     """
     serializer = HerramientaSerializer(data=request.data)
-    
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
@@ -100,14 +95,11 @@ def registrar_uso(request):
     Guarda el registro de uso (escaneo del QR) incluyendo la foto de evidencia.
     """
     serializer = RegistroUsoSerializer(data=request.data)
-    
     if serializer.is_valid():
         serializer.save()
         return Response({'message': 'Registro de uso guardado con éxito', 'data': serializer.data}, 
                         status=status.HTTP_201_CREATED)
-    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET'])
 def ver_detalle_uso_seguro(request, id): # 🚨 Cambio de 'registro_id' a 'id'
@@ -115,30 +107,30 @@ def ver_detalle_uso_seguro(request, id): # 🚨 Cambio de 'registro_id' a 'id'
     Busca un registro de uso por ID, verifica permisos y devuelve todos sus detalles 
     enriquecidos (usuario, serial, foto URL completa).
     """
-    
-    # 1. Obtener el Registro
     try:
-        # Usamos el ID pasado en la URL
         registro = RegistroUso.objects.get(pk=id) 
     except RegistroUso.DoesNotExist:
         return Response({'message': f'Registro de uso con ID {id} no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
     
-    # 2. Lógica de Permisos
     if not request.user.is_authenticated:
         return Response({'message': 'Se requiere autenticación para ver este detalle.'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Nota: Si el usuario está autenticado, permitimos el acceso. 
-    # Para ser más seguros, podrías añadir:
-    # if not request.user.is_superuser:
-    #     return Response({'message': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
-
-    # 3. Serializar la data
     serializer = RegistroUsoSerializer(registro)
     data = serializer.data
-    
-    # 4. Insertar la URL COMPLETA de la foto
     if data['foto_evidencia']:
-        # IMPORTANTE: La URL completa para acceso externo
-        data['foto_evidencia'] = f'http://192.168.0.58:8000{data["foto_evidencia"]}'
-
+        data['foto_evidencia'] = f'http://192.168.0.40:8000{data["foto_evidencia"]}'
     return Response(data, status=status.HTTP_200_OK)
+
+# ------------------- NUEVA VISTA: LISTADO DE REGISTROS DE USO -------------------
+
+@api_view(['GET'])
+def listar_registros_uso(request):
+    """
+    Devuelve todos los registros de uso (préstamos, escaneos, etc.) con info completa.
+    """
+    registros = RegistroUso.objects.all().order_by('-fecha_uso')
+    serializer = RegistroUsoSerializer(registros, many=True)
+    for item in serializer.data:
+        if item['foto_evidencia']:
+            item['foto_evidencia'] = f'http://192.168.0.40:8000{item["foto_evidencia"]}'
+    return Response(serializer.data, status=status.HTTP_200_OK)
